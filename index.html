@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nature Gallery - Real Google Sign-In</title>
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            min-height: 100vh;
+        }
+
+        /* Sign In Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+            backdrop-filter: blur(5px);
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            text-align: center;
+            max-width: 400px;
+            width: 90%;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            animation: slideIn 0.5s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateY(-100px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .modal-content h2 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+
+        .modal-content p {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 16px;
+        }
+
+        .google-btn {
+            background: white;
+            color: #444;
+            border: 2px solid #ddd;
+            padding: 12px 30px;
+            border-radius: 50px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            width: 100%;
+            transition: all 0.3s ease;
+        }
+
+        .google-btn:hover {
+            background: #f5f5f5;
+            border-color: #4285f4;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(66, 133, 244, 0.3);
+        }
+
+        .google-btn img {
+            width: 24px;
+            height: 24px;
+        }
+
+        .demo-note {
+            margin-top: 20px;
+            color: #999;
+            font-size: 13px;
+            border-top: 1px solid #eee;
+            padding-top: 15px;
+        }
+
+        /* Header */
+        header {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px 20px;
+            box-shadow: 0 2px 20px rgba(0,0,0,0.1);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-size: 24px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .logo span {
+            color: #4CAF50;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .user-info img {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 2px solid #4CAF50;
+        }
+
+        .sign-out-btn {
+            background: #ff4757;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.3s ease;
+        }
+
+        .sign-out-btn:hover {
+            background: #ff6b81;
+        }
+
+        /* Gallery */
+        .container {
+            max-width: 1200px;
+            margin: 30px auto;
+            padding: 0 20px;
+        }
+
+        .gallery-title {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+            font-size: 36px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .gallery {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 25px;
+            padding: 20px 0;
+        }
+
+        .gallery-item {
+            background: white;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .gallery-item:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+        }
+
+        .image-container {
+            position: relative;
+            height: 250px;
+            overflow: hidden;
+        }
+
+        .image-container img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform 0.5s ease;
+        }
+
+        .gallery-item:hover .image-container img {
+            transform: scale(1.1);
+        }
+
+        .image-overlay {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(to top, rgba(0,0,0,0.9), transparent);
+            padding: 20px;
+            transform: translateY(100%);
+            transition: transform 0.3s ease;
+        }
+
+        .gallery-item:hover .image-overlay {
+            transform: translateY(0);
+        }
+
+        .download-btn {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: background 0.3s ease;
+            width: 100%;
+            justify-content: center;
+        }
+
+        .download-btn:hover {
+            background: #45a049;
+            transform: scale(1.05);
+        }
+
+        .image-info {
+            padding: 15px;
+        }
+
+        .image-info h3 {
+            color: #333;
+            margin-bottom: 5px;
+            font-size: 16px;
+        }
+
+        .image-info p {
+            color: #666;
+            font-size: 14px;
+        }
+
+        /* Notification */
+        .notification {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: #4CAF50;
+            color: white;
+            padding: 15px 25px;
+            border-radius: 50px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.3);
+            transform: translateX(200%);
+            transition: transform 0.3s ease;
+            z-index: 1000;
+        }
+
+        .notification.show {
+            transform: translateX(0);
+        }
+
+        /* Footer */
+        footer {
+            text-align: center;
+            padding: 20px;
+            color: white;
+            background: rgba(0,0,0,0.3);
+            margin-top: 50px;
+        }
+
+        /* Loading Spinner */
+        .spinner {
+            display: none;
+            width: 50px;
+            height: 50px;
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #4CAF50;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <!-- Sign In Modal -->
+    <div class="modal active" id="signinModal">
+        <div class="modal-content">
+            <h2>🌿 Nature Gallery</h2>
+            <p>Sign in with Google to access and download beautiful nature photos</p>
+            <button class="google-btn" id="googleSignInBtn">
+                <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Cpath fill='%23FFC107' d='M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24c0,11.045,8.955,20,20,20c11.045,0,20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z' /%3E%3Cpath fill='%23FF3D00' d='M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z' /%3E%3Cpath fill='%234CAF50' d='M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.202,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z' /%3E%3Cpath fill='%231976D2' d='M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.571c0.001-0.001,0.002-0.001,0.003-0.002l6.19,5.238C36.971,39.205,44,34,44,24C44,22.659,43.862,21.35,43.611,20.083z' /%3E%3C/svg%3E" alt="Google">
+                Sign in with Google
+            </button>
+            <div class="spinner" id="spinner"></div>
+            <p class="demo-note">🔐 Real Google Sign-In with Firebase</p>
+        </div>
+    </div>
+
+    <!-- Header -->
+    <header>
+        <div class="header-content">
+            <div class="logo">Nature <span>Gallery</span> 🌿</div>
+            <div class="user-info" id="userInfo" style="display: none;">
+                <img id="userAvatar" src="" alt="Profile">
+                <span id="userName"></span>
+                <span id="userEmail" style="color: #666; font-size: 14px;"></span>
+                <button class="sign-out-btn" id="signOutBtn">Sign Out</button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Gallery -->
+    <div class="container">
+        <h1 class="gallery-title">Beautiful Nature Photos</h1>
+        
+        <div class="gallery" id="gallery">
+            <!-- Photos will be loaded here -->
+        </div>
+    </div>
+
+    <!-- Notification -->
+    <div class="notification" id="notification">
+        Photo downloaded successfully! 📥
+    </div>
+
+    <!-- Footer -->
+    <footer>
+        <p>© 2024 Nature Gallery. Photos from Unsplash</p>
+    </footer>
+
+    <script>
+        // TODO: Replace with your Firebase configuration
+        // Aapko Firebase Console se yeh config copy karna hoga
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_AUTH_DOMAIN",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_STORAGE_BUCKET",
+            messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const googleProvider = new firebase.auth.GoogleAuthProvider();
+
+        // Additional Google scopes (optional)
+        googleProvider.addScope('profile');
+        googleProvider.addScope('email');
+        
+        // Custom parameters (optional)
+        googleProvider.setCustomParameters({
+            'prompt': 'select_account'
+        });
+
+        // Sample nature photos data
+        const naturePhotos = [
+            {
+                id: 1,
+                title: "Mountain Sunset",
+                photographer: "John Doe",
+                url: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400&h=300&fit=crop",
+                downloadUrl: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800"
+            },
+            {
+                id: 2,
+                title: "Forest Stream",
+                photographer: "Jane Smith",
+                url: "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=400&h=300&fit=crop",
+                downloadUrl: "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=800"
+            },
+            {
+                id: 3,
+                title: "Ocean Waves",
+                photographer: "Mike Johnson",
+                url: "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=400&h=300&fit=crop",
+                downloadUrl: "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=800"
+            },
+            {
+                id: 4,
+                title: "Mountain Lake",
+                photographer: "Sarah Wilson",
+                url: "https://images.unsplash.com/photo-1472214103451-9374bd1c798e?w=400&h=300&fit=crop",
+                downloadUrl: "https://images.unsplash.com/photo-1472214103451-9374bd1c798e?w=800"
+            },
+            {
+                id: 5,
+                title: "Autumn Forest",
+                photographer: "David Brown",
+                url: "https://images.unsplash.com/photo-1445964047600-cdbdb873673d?w=400&h=300&fit=crop",
+                downloadUrl: "https://images.unsplash.com/photo-1445964047600-cdbdb873673d?w=800"
+            },
+            {
+                id: 6,
+                title: "Waterfall",
+                photographer: "Emily Davis",
+                url: "https://images.unsplash.com/photo-1433086966354-5a9b5fec55f6?w=400&h=300&fit=crop",
+                downloadUrl: "https://images.unsplash.com/photo-1433086966354-5a9b5fec55f6?w=800"
+            }
+        ];
+
+        // Check if user is already signed in (persistent session)
+        auth.onAuthStateChanged((user) => {
+            if (user) {
+                // User is signed in
+                console.log("User signed in:", user.email);
+                document.getElementById('signinModal').classList.remove('active');
+                document.getElementById('userInfo').style.display = 'flex';
+                document.getElementById('userName').textContent = user.displayName || 'User';
+                document.getElementById('userEmail').textContent = user.email || '';
+                document.getElementById('userAvatar').src = user.photoURL || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(user.displayName || 'User');
+                
+                // Enable downloads
+                displayGallery(true);
+                showNotification('Welcome back, ' + (user.displayName || 'User') + '! 🎉');
+            } else {
+                // User is signed out
+                console.log("User signed out");
+                document.getElementById('userInfo').style.display = 'none';
+                document.getElementById('signinModal').classList.add('active');
+                displayGallery(false);
+            }
+        });
+
+        // Google Sign-In
+        document.getElementById('googleSignInBtn').addEventListener('click', () => {
+            const spinner = document.getElementById('spinner');
+            spinner.style.display = 'block';
+            
+            auth.signInWithPopup(googleProvider)
+                .then((result) => {
+                    // Successful sign-in
+                    const user = result.user;
+                    console.log('Sign-in successful:', user.email);
+                    showNotification('Successfully signed in! ✨');
+                })
+                .catch((error) => {
+                    // Handle errors
+                    console.error('Sign-in error:', error);
+                    let errorMessage = 'Sign-in failed. Please try again.';
+                    
+                    switch(error.code) {
+                        case 'auth/popup-closed-by-user':
+                            errorMessage = 'Sign-in cancelled. Please try again.';
+                            break;
+                        case 'auth/popup-blocked':
+                            errorMessage = 'Pop-up blocked. Please allow pop-ups for this site.';
+                            break;
+                        case 'auth/account-exists-with-different-credential':
+                            errorMessage = 'An account already exists with the same email but different sign-in method.';
+                            break;
+                    }
+                    
+                    showNotification('❌ ' + errorMessage);
+                })
+                .finally(() => {
+                    spinner.style.display = 'none';
+                });
+        });
+
+        // Sign Out
+        document.getElementById('signOutBtn').addEventListener('click', () => {
+            auth.signOut()
+                .then(() => {
+                    showNotification('Signed out successfully');
+                })
+                .catch((error) => {
+                    console.error('Sign-out error:', error);
+                    showNotification('❌ Error signing out');
+                });
+        });
+
+        // Display gallery based on auth state
+        function displayGallery(isLoggedIn) {
+            const gallery = document.getElementById('gallery');
+            
+            if (isLoggedIn) {
+                // Show all photos with download option
+                gallery.innerHTML = naturePhotos.map(photo => `
+                    <div class="gallery-item">
+                        <div class="image-container">
+                            <img src="${photo.url}" alt="${photo.title}" loading="lazy">
+                            <div class="image-overlay">
+                                <button class="download-btn" onclick="downloadPhoto('${photo.downloadUrl}', '${photo.title}')">
+                                    📥 Download Photo
+                                </button>
+                            </div>
+                        </div>
+                        <div class="image-info">
+                            <h3>${photo.title}</h3>
+                            <p>By: ${photo.photographer}</p>
+                        </div>
+                    </div>
+                `).join('');
+            } else {
+                // Show preview with sign-in prompt
+                gallery.innerHTML = naturePhotos.map(photo => `
+                    <div class="gallery-item" style="opacity: 0.7;">
+                        <div class="image-container">
+                            <img src="${photo.url}" alt="${photo.title}" loading="lazy">
+                            <div class="image-overlay" style="background: linear-gradient(to top, rgba(0,0,0,0.9), transparent);">
+                                <button class="download-btn" onclick="document.getElementById('signinModal').classList.add('active')" style="background: #666;">
+                                    🔒 Sign in to download
+                                </button>
+                            </div>
+                        </div>
+                        <div class="image-info">
+                            <h3>${photo.title}</h3>
+                            <p>By: ${photo.photographer}</p>
+                        </div>
+                    </div>
+                `).join('');
+            }
+        }
+
+        // Download photo
+        window.downloadPhoto = function(url, title) {
+            const user = auth.currentUser;
+            if (!user) {
+                document.getElementById('signinModal').classList.add('active');
+                return;
+            }
+            
+            // Create a temporary link for download
+            fetch(url)
+                .then(response => response.blob())
+                .then(blob => {
+                    const blobUrl = window.URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = blobUrl;
+                    link.download = `${title.toLowerCase().replace(/\s+/g, '-')}.jpg`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    window.URL.revokeObjectURL(blobUrl);
+                    
+                    showNotification(`📥 "${title}" downloaded to your device!`);
+                })
+                .catch(error => {
+                    console.error('Download error:', error);
+                    showNotification('❌ Download failed. Please try again.');
+                });
+        };
+
+        // Show notification
+        function showNotification(message) {
+            const notification = document.getElementById('notification');
+            notification.textContent = message;
+            notification.classList.add('show');
+            
+            setTimeout(() => {
+                notification.classList.remove('show');
+            }, 3000);
+        }
+
+        // Initial gallery display
+        displayGallery(false);
+    </script>
+</body>
+</html>
